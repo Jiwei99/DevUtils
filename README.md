@@ -16,10 +16,10 @@ DevUtils is a collection of focused developer utilities that run entirely in the
 
 ## Getting started
 
-The Next.js application lives in `app`:
+The Next.js application lives in `webapp`:
 
 ```bash
-cd app
+cd webapp
 npm install
 npm run dev
 ```
@@ -29,7 +29,7 @@ Open [http://localhost:3000](http://localhost:3000) in a browser.
 ## Verification
 
 ```bash
-cd app
+cd webapp
 npm run lint
 npx tsc --noEmit
 npm run build
@@ -40,7 +40,7 @@ npm run build
 ```text
 DevUtils/
 ├── README.md
-└── app/
+└── webapp/
     ├── public/
     └── src/
         ├── app/          # Pages and routes
