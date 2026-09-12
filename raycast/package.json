@@ -1,0 +1,162 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "devutils",
+  "title": "DevUtils",
+  "version": "1.0.0",
+  "description": "Open browser-based developer utilities directly from Raycast.",
+  "icon": "icon.png",
+  "author": "jiweilim",
+  "platforms": [
+    "macOS",
+    "Windows"
+  ],
+  "license": "MIT",
+  "categories": [
+    "Developer Tools"
+  ],
+  "keywords": [
+    "developer",
+    "utilities",
+    "json",
+    "regex",
+    "cron",
+    "converter"
+  ],
+  "commands": [
+    {
+      "name": "open-devutils",
+      "title": "Open DevUtils",
+      "subtitle": "DevUtils",
+      "description": "Open the DevUtils home page in your browser.",
+      "mode": "no-view",
+      "keywords": [
+        "home",
+        "dashboard"
+      ]
+    },
+    {
+      "name": "open-json-formatter",
+      "title": "Open JSON Formatter",
+      "subtitle": "DevUtils",
+      "description": "Open the JSON Formatter in your browser.",
+      "mode": "no-view",
+      "keywords": [
+        "format",
+        "sort",
+        "validate"
+      ]
+    },
+    {
+      "name": "open-text-json-diff",
+      "title": "Open Text & JSON Diff",
+      "subtitle": "DevUtils",
+      "description": "Open the Text and JSON Diff utility in your browser.",
+      "mode": "no-view",
+      "keywords": [
+        "compare",
+        "difference"
+      ]
+    },
+    {
+      "name": "open-regex-tester",
+      "title": "Open Regex Tester",
+      "subtitle": "DevUtils",
+      "description": "Open the Regex Tester in your browser.",
+      "mode": "no-view",
+      "keywords": [
+        "regular expression",
+        "pattern"
+      ]
+    },
+    {
+      "name": "open-cron-explorer",
+      "title": "Open Cron Explorer",
+      "subtitle": "DevUtils",
+      "description": "Open the Cron Explorer in your browser.",
+      "mode": "no-view",
+      "keywords": [
+        "schedule",
+        "job"
+      ]
+    },
+    {
+      "name": "open-json-encoder",
+      "title": "Open JSON Encoder / Decoder",
+      "subtitle": "DevUtils",
+      "description": "Open the JSON Encoder and Decoder in your browser.",
+      "mode": "no-view",
+      "keywords": [
+        "form",
+        "urlencoded",
+        "string"
+      ]
+    },
+    {
+      "name": "open-number-base",
+      "title": "Open Number Base Converter",
+      "subtitle": "DevUtils",
+      "description": "Open the Number Base Converter in your browser.",
+      "mode": "no-view",
+      "keywords": [
+        "binary",
+        "octal",
+        "decimal",
+        "hexadecimal"
+      ]
+    },
+    {
+      "name": "open-time-units",
+      "title": "Open Time Unit Converter",
+      "subtitle": "DevUtils",
+      "description": "Open the Time Unit Converter in your browser.",
+      "mode": "no-view",
+      "keywords": [
+        "duration",
+        "seconds",
+        "milliseconds"
+      ]
+    },
+    {
+      "name": "open-unix-time",
+      "title": "Open Unix Time Converter",
+      "subtitle": "DevUtils",
+      "description": "Open the Unix Time Converter in your browser.",
+      "mode": "no-view",
+      "keywords": [
+        "timestamp",
+        "epoch",
+        "date"
+      ]
+    },
+    {
+      "name": "open-string-case",
+      "title": "Open String Case Converter",
+      "subtitle": "DevUtils",
+      "description": "Open the String Case Converter in your browser.",
+      "mode": "no-view",
+      "keywords": [
+        "camel",
+        "pascal",
+        "snake",
+        "kebab"
+      ]
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "^1.104.19"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^2.0.4",
+    "@types/node": "22.19.17",
+    "@types/react": "19.0.10",
+    "eslint": "^9.22.0",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.2"
+  },
+  "scripts": {
+    "dev": "ray develop",
+    "build": "ray build",
+    "lint": "ray lint",
+    "fix-lint": "ray lint --fix"
+  }
+}

@@ -40,6 +40,7 @@ npm run build
 ```text
 DevUtils/
 ├── README.md
+├── raycast/           # Raycast commands for opening each utility
 └── webapp/
     ├── public/
     └── src/
@@ -51,3 +52,7 @@ DevUtils/
 ## Privacy
 
 All utility processing happens in client-side JavaScript. DevUtils does not require an API server, database, account, or file upload service.
+
+## Raycast extension
+
+The `raycast` directory contains a local no-view command for every DevUtils page. Each command opens the corresponding route at `https://devutils.jiwei.dev`; see [`raycast/README.md`](raycast/README.md) for setup instructions.
