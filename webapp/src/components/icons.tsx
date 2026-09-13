@@ -11,6 +11,7 @@ type IconName =
   | "format"
   | "hash"
   | "home"
+  | "keyboard"
   | "lock"
   | "search"
   | "text"
@@ -56,6 +57,10 @@ export function Icon({ name, ...props }: IconProps) {
 
   if (name === "home") {
     return <svg {...common}><path d="m3 11 9-8 9 8M5 10v10h14V10M9 20v-6h6v6" /></svg>;
+  }
+
+  if (name === "keyboard") {
+    return <svg {...common}><rect width="20" height="14" x="2" y="5" rx="2" /><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M10 13h.01M14 13h.01M18 13h.01M7 16h10" /></svg>;
   }
 
   if (name === "text") {

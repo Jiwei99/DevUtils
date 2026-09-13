@@ -20,7 +20,12 @@
     "json",
     "regex",
     "cron",
-    "converter"
+    "converter",
+    "shortcuts",
+    "keyboard",
+    "bash",
+    "chrome",
+    "macos"
   ],
   "commands": [
     {
@@ -139,6 +144,19 @@
         "pascal",
         "snake",
         "kebab"
+      ]
+    },
+    {
+      "name": "open-keyboard-shortcuts",
+      "title": "Open Keyboard Shortcuts",
+      "subtitle": "DevUtils",
+      "description": "Open the searchable keyboard shortcut library in your browser.",
+      "mode": "no-view",
+      "keywords": [
+        "bash",
+        "chrome",
+        "macos",
+        "keys"
       ]
     }
   ],

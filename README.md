@@ -13,6 +13,7 @@ DevUtils is a collection of focused developer utilities that run entirely in the
 - **Time Unit Converter** — convert durations from nanoseconds through weeks.
 - **Unix Time Converter** — convert timestamps to readable dates and local dates back to Unix seconds or milliseconds.
 - **String Case Converter** — generate camel, Pascal, snake, kebab, constant, title, sentence, dot, and path casing.
+- **Keyboard Shortcuts** — search common Bash, Chrome for Mac, and macOS keyboard shortcuts.
 
 ## Getting started
 

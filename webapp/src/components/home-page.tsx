@@ -65,6 +65,13 @@ const tools = [
     icon: "text",
     group: "Text",
   },
+  {
+    title: "Keyboard Shortcuts",
+    description: "Search common Bash, Chrome for Mac, and macOS shortcuts.",
+    href: "/shortcuts",
+    icon: "keyboard",
+    group: "Reference",
+  },
 ] as const;
 
 export function HomePage() {

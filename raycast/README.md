@@ -18,6 +18,7 @@ Each utility is exposed as its own searchable, no-view Raycast command. Running 
 | Open Time Unit Converter | `/time` |
 | Open Unix Time Converter | `/unix-time` |
 | Open String Case Converter | `/string-case` |
+| Open Keyboard Shortcuts | `/shortcuts` |
 
 All routes use this base URL:
 

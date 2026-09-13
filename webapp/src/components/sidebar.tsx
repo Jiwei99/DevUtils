@@ -15,6 +15,7 @@ const utilities = [
   { label: "Time Units", icon: "clock", href: "/time" },
   { label: "Unix Time", icon: "unix", href: "/unix-time" },
   { label: "String Case", icon: "text", href: "/string-case" },
+  { label: "Keyboard Shortcuts", icon: "keyboard", href: "/shortcuts" },
 ] as const;
 
 export function Sidebar() {
