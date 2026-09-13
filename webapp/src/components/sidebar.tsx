@@ -51,15 +51,23 @@ export function Sidebar() {
         </nav>
 
         <div className="sidebar-foot">
-          © 2026 DevUtils
+          <span>© 2026 DevUtils</span>
+          <a href="https://github.com/Jiwei99/DevUtils" target="_blank" rel="noreferrer" aria-label="View DevUtils on GitHub" title="GitHub">
+            <Icon name="github" />
+          </a>
         </div>
       </aside>
 
       <header className="mobile-navigation">
-        <Link className="brand" href="/">
-          <span className="brand-mark">&lt;/&gt;</span>
-          <span>DevUtils</span>
-        </Link>
+        <div className="mobile-brand-row">
+          <Link className="brand" href="/">
+            <span className="brand-mark">&lt;/&gt;</span>
+            <span>DevUtils</span>
+          </Link>
+          <a className="mobile-github-link" href="https://github.com/Jiwei99/DevUtils" target="_blank" rel="noreferrer" aria-label="View DevUtils on GitHub" title="GitHub">
+            <Icon name="github" />
+          </a>
+        </div>
         <nav className="mobile-links" aria-label="Developer utilities">
           {utilities.map((utility) => {
             const active = pathname === utility.href;
