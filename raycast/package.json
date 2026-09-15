@@ -3,7 +3,7 @@
   "name": "devutils",
   "title": "DevUtils",
   "version": "1.0.0",
-  "description": "Open browser-based developer utilities directly from Raycast.",
+  "description": "Open DevUtils pages and manage local Git worktree groups from Raycast.",
   "icon": "icon.png",
   "author": "jiweilim",
   "platforms": [
@@ -22,10 +22,9 @@
     "cron",
     "converter",
     "shortcuts",
-    "keyboard",
-    "bash",
-    "chrome",
-    "macos"
+    "git",
+    "worktree",
+    "branch"
   ],
   "commands": [
     {
@@ -158,6 +157,22 @@
         "macos",
         "keys"
       ]
+    },
+    {
+      "name": "create-worktree-group",
+      "title": "Create Worktree Group",
+      "subtitle": "DevUtils",
+      "description": "Create linked Git worktrees for multiple local repositories in one new folder.",
+      "mode": "view",
+      "keywords": ["git", "worktree", "branches", "repository"]
+    },
+    {
+      "name": "remove-worktree-group",
+      "title": "Remove Worktree Group",
+      "subtitle": "DevUtils",
+      "description": "Safely remove linked worktrees and their empty enclosing folder.",
+      "mode": "view",
+      "keywords": ["git", "worktree", "delete", "cleanup"]
     }
   ],
   "dependencies": {
