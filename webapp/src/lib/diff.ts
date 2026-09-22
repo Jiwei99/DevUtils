@@ -25,6 +25,13 @@ type DiffOperation = {
   text: string;
 };
 
+export type DiffInputMode = "json" | "text";
+
+export type PreparedDiffInput = {
+  value: string;
+  decodedJsonString: boolean;
+};
+
 function splitLines(value: string): string[] {
   return value === "" ? [] : value.replace(/\r\n?/g, "\n").split("\n");
 }
@@ -215,20 +222,25 @@ export function createLineDiff(beforeText: string, afterText: string): DiffResul
   return { lines, additions, removals, unchanged };
 }
 
-export function prepareDiffInput(before: string, after: string): {
-  before: string;
-  after: string;
-  json: boolean;
-} {
-  try {
-    JSON.parse(before);
-    JSON.parse(after);
+export function prepareDiffInput(input: string, mode: DiffInputMode): PreparedDiffInput {
+  if (input === "" || mode === "text") {
+    return { value: input, decodedJsonString: false };
+  }
+
+  const parsed: unknown = JSON.parse(input);
+  if (typeof parsed !== "string") {
     return {
-      before: formatJson(before, { arrayStyle: "expanded", sortKeys: true }),
-      after: formatJson(after, { arrayStyle: "expanded", sortKeys: true }),
-      json: true,
+      value: formatJson(input, { arrayStyle: "expanded", sortKeys: true }),
+      decodedJsonString: false,
+    };
+  }
+
+  try {
+    return {
+      value: formatJson(parsed, { arrayStyle: "expanded", sortKeys: true }),
+      decodedJsonString: true,
     };
   } catch {
-    return { before, after, json: false };
+    return { value: parsed, decodedJsonString: true };
   }
 }

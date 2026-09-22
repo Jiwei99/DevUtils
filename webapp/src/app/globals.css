@@ -192,24 +192,35 @@ h1 { margin: 0; color: #182433; font-size: clamp(30px, 3vw, 38px); font-weight: 
 .case-row code { min-width: 0; overflow-wrap: anywhere; color: #293e5a; font-size: 12px; }
 
 /* Text and JSON diff */
-.diff-input-card, .diff-result-card { max-width: 1280px; margin-inline: auto; }
+.diff-input-card, .diff-prepared-card, .diff-result-card { max-width: 1280px; margin-inline: auto; }
 .diff-editors { display: grid; min-height: 330px; grid-template-columns: 1fr 1fr; }
 .diff-pane { display: flex; min-width: 0; flex-direction: column; }
 .diff-pane + .diff-pane { border-left: 1px solid var(--line); }
 .diff-pane .editor-input { min-height: 275px; resize: vertical; }
+.diff-mode-bar { display: flex; min-height: 62px; align-items: center; justify-content: space-between; gap: 18px; border-bottom: 1px solid var(--line); padding: 12px 18px 12px 20px; }
+.diff-mode-control { display: flex; align-items: center; gap: 12px; }
+.diff-mode-hint { color: #8b97a7; font-size: 11px; }
 .diff-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
 .diff-dot.before { background: #ef777b; }
 .diff-dot.after { background: #4dbb7d; }
 .panel-meta { color: #9aa5b3; font-size: 10px; font-weight: 500; }
+.diff-format-select { min-width: 112px; min-height: 34px; border: 1px solid #dce3eb; border-radius: 7px; outline: 0; background: #fff; padding: 0 8px; color: #526175; font-size: 11px; font-weight: 650; }
+.diff-format-select:focus { border-color: #86aaf8; box-shadow: 0 0 0 3px rgb(55 114 242 / 10%); }
 .diff-actions { display: flex; min-height: 70px; align-items: center; justify-content: space-between; gap: 16px; border-top: 1px solid var(--line); padding: 13px 18px 13px 22px; }
 .diff-actions > div { display: flex; gap: 8px; }
 .secondary-button { display: inline-flex; min-height: 40px; align-items: center; justify-content: center; border: 1px solid #dce3eb; border-radius: 8px; background: #fff; padding: 0 13px; color: #667085; font-size: 12px; font-weight: 650; }
 .secondary-button:hover { border-color: #b9c6d5; color: #344054; }
-.diff-result-card { margin-top: 20px; }
+.diff-prepared-card, .diff-result-card { margin-top: 20px; }
 .diff-summary { display: flex; min-height: 65px; align-items: center; justify-content: space-between; gap: 18px; border-bottom: 1px solid var(--line); padding: 13px 20px; }
 .diff-summary > div { display: flex; align-items: center; gap: 12px; }
 .comparison-mode { border-radius: 99px; background: #f0f3f7; padding: 5px 8px; color: #7a8798; font-size: 10px; font-weight: 700; }
 .comparison-mode.json { background: #edf3ff; color: #3765bb; }
+.prepared-grid { display: grid; grid-template-columns: 1fr 1fr; }
+.prepared-pane { min-width: 0; }
+.prepared-pane + .prepared-pane { border-left: 1px solid var(--line); }
+.prepared-heading { display: flex; min-height: 52px; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #f0f2f5; padding: 10px 16px 10px 20px; }
+.prepared-output { min-height: 180px; max-height: 360px; overflow: auto; margin: 0; background: #fcfdff; padding: 16px 20px; color: #3d4a5c; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; line-height: 1.65; white-space: pre; }
+.prepared-empty { min-height: 150px; }
 .diff-stats span { color: #8792a1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
 .diff-stats .removed { color: #c85055; }
 .diff-stats .added { color: #298555; }
@@ -739,6 +750,9 @@ h1 { margin: 0; color: #182433; font-size: clamp(30px, 3vw, 38px); font-weight: 
   .case-row, .value-row { grid-template-columns: 95px minmax(0, 1fr) auto; }
   .diff-editors { grid-template-columns: 1fr; }
   .diff-pane + .diff-pane { border-top: 1px solid var(--line); border-left: 0; }
+  .prepared-grid { grid-template-columns: 1fr; }
+  .prepared-pane + .prepared-pane { border-top: 1px solid var(--line); border-left: 0; }
+  .diff-mode-bar { align-items: flex-start; flex-direction: column; gap: 7px; }
   .diff-actions, .diff-summary { align-items: stretch; flex-direction: column; }
   .diff-actions > div { display: grid; grid-template-columns: 1fr 1fr; }
   .diff-actions .format-button { grid-column: 1 / -1; }
@@ -764,6 +778,7 @@ h1 { margin: 0; color: #182433; font-size: clamp(30px, 3vw, 38px); font-weight: 
   .privacy-note { white-space: normal; }
   .options-bar { padding-inline: 16px; }
   .option { width: 100%; justify-content: space-between; }
+  .diff-mode-control { width: 100%; justify-content: space-between; }
   .cron-field-guide { padding-inline: 9px; }
   .cron-field-guide strong { font-size: 9px; }
   .converter-card { padding: 16px; }
