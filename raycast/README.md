@@ -1,24 +1,24 @@
 # DevUtils for Raycast
 
-A local Raycast extension that opens the developer utilities hosted at [devutils.jiwei.dev](https://devutils.jiwei.dev) and manages Git worktree groups on your computer.
+A local Raycast extension that opens the developer utilities hosted at [devutils.jiwei.dev](https://devutils.jiwei.dev) and manages Git worktree folders on your computer.
 
 Each utility is exposed as its own searchable, no-view Raycast command. Running a command opens the corresponding page in the default browser without displaying an intermediate Raycast view.
 
 ## Available commands
 
-| Raycast command | Page |
-| --- | --- |
-| Open DevUtils | `/` |
-| Open JSON Formatter | `/json` |
-| Open Text & JSON Diff | `/diff` |
-| Open Regex Tester | `/regex` |
-| Open Cron Explorer | `/cron` |
-| Open JSON Encoder / Decoder | `/encoder` |
-| Open Number Base Converter | `/number-base` |
-| Open Time Unit Converter | `/time` |
-| Open Unix Time Converter | `/unix-time` |
-| Open String Case Converter | `/string-case` |
-| Open Keyboard Shortcuts | `/shortcuts` |
+| Raycast command             | Page           |
+| --------------------------- | -------------- |
+| Open DevUtils               | `/`            |
+| Open JSON Formatter         | `/json`        |
+| Open Text & JSON Diff       | `/diff`        |
+| Open Regex Tester           | `/regex`       |
+| Open Cron Explorer          | `/cron`        |
+| Open JSON Encoder / Decoder | `/encoder`     |
+| Open Number Base Converter  | `/number-base` |
+| Open Time Unit Converter    | `/time`        |
+| Open Unix Time Converter    | `/unix-time`   |
+| Open String Case Converter  | `/string-case` |
+| Open Keyboard Shortcuts     | `/shortcuts`   |
 
 All routes use this base URL:
 
@@ -28,22 +28,25 @@ https://devutils.jiwei.dev
 
 ## Git worktree commands
 
-| Raycast command | Purpose |
-| --- | --- |
-| Create Worktree Group | Pick multiple repository roots, a destination parent, a new group folder name, and a target branch for each repository. |
-| Remove Worktree Group | Pick an enclosing folder, review its linked worktrees, and remove eligible worktrees and the empty folder. |
+| Raycast command        | Purpose                                                                      |
+| ---------------------- | ---------------------------------------------------------------------------- |
+| Create Worktree Folder | Choose a destination, then add and configure repositories one at a time.     |
+| Update Worktree Folder | Add repositories to or remove worktrees from an existing worktree folder.    |
+| Remove Worktree Folder | Pick a worktree folder, review its linked worktrees, and safely remove them. |
 
-The create command uses Raycast's graphical directory pickers and searchable branch dropdowns. Choose each repository's main checkout folder (not a linked worktree or subfolder). It offers an "Apply to All" target selection when the same local or remote-tracking ref exists in every chosen repository. Every repository must have an explicit starting target selection before creation.
+The create command first asks for a destination folder. Enter an optional new folder name to create a worktree folder inside that destination, or leave it empty to store the worktrees directly in the selected destination. A reused destination may contain unrelated files; DevUtils records and later removes only the worktrees it creates there.
 
-To create a branch with the same name in every repository, enter **New Branch for All** and choose the starting target for each repository. For a mixed group, leave that field empty and enable **New Branch** on only the repositories that need one, then enter each branch name. New names are checked with Git's branch-name rules and must not conflict with existing local branches. The confirmation shows the branch that each worktree will check out.
+Repositories are added and configured one at a time. Choose each repository's main checkout folder (not a linked worktree or subfolder), then either select an existing branch or enter a new branch name and choose the branch it should start from. New names are checked with Git's branch-name rules and must not conflict with existing local branches. The confirmation shows the branch that each worktree will check out.
 
-Remote-tracking branches are read from local Git refs. Creation never fetches automatically. To update those refs, select repositories and run **Fetch Remote Branches** from the form's action menu. It asks for confirmation, then runs `git fetch` for every configured remote in the selected repositories, refreshes the branch dropdowns, and reports any failures. Each fetch has a five-minute timeout. This action contacts the Git remotes but does not push, create worktrees, or use a DevUtils backend. Authentication must be available through your normal Git credential helper or SSH agent; the extension does not open a terminal password prompt.
+Selecting a repository automatically runs `git fetch origin` with a five-minute timeout and refreshes its branch list. A failed fetch is shown in both a toast and the repository list; cached local and remote-tracking refs remain selectable. Authentication must be available through your normal Git credential helper or SSH agent because the extension does not open a terminal password prompt.
 
-For a new branch based on the latest remote default branch, run **Fetch Remote Branches**, then select `origin/main`, `origin/master`, or the corresponding ref from another remote as that repository's target. Make sure that ref appears after fetching; Git honors the repository's configured fetch refspecs. The new branch starts at the fetched commit. The command does **not** pull into the local `main`/`master` checkout, which may be behind or contain local changes. Every new branch is created with `--no-track`, so it has no upstream—neither the base branch nor a remote branch—until you explicitly set one when pushing, for example with `git push -u origin feature/my-feature`.
+For a new branch, **Branch Off From** defaults to `origin/main`, then `origin/master` when available, with local `main` or `master` as a fallback. The command does **not** pull into the local checkout, which may be behind or contain local changes. Every new branch is created with `--no-track`, so it has no upstream until you explicitly set one when pushing, for example with `git push -u origin feature/my-feature`.
 
 Selecting an existing local branch that is already checked out anywhere produces an error before a folder is created; choose a different branch or explicitly create a new one from that target. A remote target creates a new local branch from the selected remote-tracking ref, using the remote branch name when available or a unique `devutils/...` name when it would collide. The review confirmation shows the actual branch that will be checked out.
 
-The remove command verifies that each immediate child is a linked worktree, never a main checkout. It blocks removal when it finds tracked changes, untracked or ignored files, locks, submodules, symlinks, or unrelated folder contents. It never uses `git worktree remove --force`; resolve those items and retry. Git branches and the original repositories remain untouched. The enclosing folder is removed only if it is empty after all worktrees are removed. A failure midway leaves the remaining worktrees and folder in place and reports how many completed.
+The update command starts from the linked worktrees currently present in the selected folder, including worktrees added manually outside DevUtils. It can also adopt a folder of linked worktrees that does not have a DevUtils manifest. Additions use the same repository and branch flow as creation. Removals are staged in the worktree list and applied only after a confirmation that summarizes every change. A worktree with tracked changes, untracked or ignored files, a lock, or submodules can remain in the folder but cannot be removed until it is clean. Updates preserve the worktree folder, source repositories, and Git branches.
+
+The remove command verifies each linked worktree and blocks removal when it finds tracked changes, untracked or ignored files, locks, submodules, or symlinks. It never uses `git worktree remove --force`; resolve those items and retry. Git branches and the source repositories remain untouched. A worktree folder created by DevUtils is removed only after it is empty; a destination selected directly is always preserved along with unrelated contents. A failure midway leaves the remaining worktrees and reports how many completed.
 
 ## Prerequisites
 
@@ -95,9 +98,11 @@ raycast/
 │   ├── lib/
 │   │   ├── open-page.ts       # Shared URL-opening implementation
 │   │   ├── git-worktrees.ts   # Git repository and ref inspection
-│   │   └── worktree-groups.ts # Group creation and guarded removal
+│   │   └── worktree-groups.ts # Folder creation, updates, and guarded removal
 │   ├── open-*.ts              # Browser command entry points
+│   ├── worktree-repository-form.tsx
 │   ├── create-worktree-group.tsx
+│   ├── update-worktree-group.tsx
 │   └── remove-worktree-group.tsx
 ├── package.json             # Extension manifest and commands
 ├── eslint.config.js
@@ -106,6 +111,6 @@ raycast/
 
 ## Local-only scope
 
-This extension is intended for local installation and is not configured with a Raycast Store publishing command. Browser commands only open the requested DevUtils page; worktree commands process local folders using Git and Node.js. Only the explicit **Fetch Remote Branches** action contacts Git remotes; there are no DevUtils backend calls. Processing within the DevUtils website remains browser-side.
+This extension is intended for local installation and is not configured with a Raycast Store publishing command. Browser commands only open the requested DevUtils page; worktree commands process local folders using Git and Node.js. Selecting a repository in the create or update flow contacts its `origin` remote; there are no DevUtils backend calls. Processing within the DevUtils website remains browser-side.
 
 To change the hosted domain, update `DEVUTILS_BASE_URL` in `src/lib/open-page.ts`.

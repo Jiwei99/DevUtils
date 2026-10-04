@@ -24,16 +24,17 @@ import {
 
 const MANIFEST_NAME = ".devutils-worktree-group.json";
 
-type ManifestWorktree = {
+export type ManifestWorktree = {
   source: string;
   path: string;
   selectedRef: string;
   checkedOutBranch: string;
 };
 
-type GroupManifest = {
-  version: 1;
+export type GroupManifest = {
+  version: 1 | 2;
   createdAt: string;
+  ownsFolder?: boolean;
   worktrees: ManifestWorktree[];
 };
 
@@ -51,6 +52,7 @@ export type BranchSelection = {
 
 export type CreatePlan = {
   folder: string;
+  createFolder: boolean;
   worktrees: PlannedWorktree[];
 };
 
@@ -66,6 +68,33 @@ export type GroupInspection = {
   worktrees: InspectedWorktree[];
   issues: string[];
   hasManifest: boolean;
+  removeFolder: boolean;
+};
+
+export type PreparedDestination = {
+  folder: string;
+  createFolder: boolean;
+};
+
+export type ManagedGroupInspection = GroupInspection & {
+  manifest: GroupManifest;
+};
+
+export type UpdatePlan = {
+  folder: string;
+  additions: PlannedWorktree[];
+  removals: InspectedWorktree[];
+};
+
+export type UpdateProgress = {
+  completed: number;
+  total: number;
+  phase: "adding" | "removing";
+};
+
+export type UpdateResult = {
+  added: number;
+  removed: number;
 };
 
 export class PartialGroupError extends Error {
@@ -102,6 +131,37 @@ function validateFolderName(value: string): string {
     throw new Error("Enter a single new folder name without path separators.");
   }
   return name;
+}
+
+async function requireMissing(targetPath: string, message: string): Promise<void> {
+  try {
+    await lstat(targetPath);
+    throw new Error(message);
+  } catch (error) {
+    if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+  }
+}
+
+export async function prepareDestination(
+  destinationParent: string,
+  groupNameInput: string,
+): Promise<PreparedDestination> {
+  const parent = await requireDirectory(destinationParent);
+  await access(parent, constants.W_OK);
+  const requestedName = groupNameInput.trim();
+  const createFolder = requestedName.length > 0;
+  const folder = createFolder ? path.join(parent, validateFolderName(requestedName)) : parent;
+
+  if (createFolder) {
+    await requireMissing(folder, `The destination already exists: ${folder}`);
+  } else {
+    await requireMissing(
+      path.join(folder, MANIFEST_NAME),
+      `The destination already contains a DevUtils worktree group: ${folder}`,
+    );
+  }
+
+  return { folder, createFolder };
 }
 
 function availableBranchName(repository: GitRepository, baseName: string): string {
@@ -143,7 +203,68 @@ function planBranch(
   };
 }
 
-async function validateNewBranchName(repository: GitRepository, input: string): Promise<string> {
+async function planWorktrees(
+  repositoryPaths: string[],
+  folder: string,
+  groupName: string,
+  selections: Record<string, BranchSelection>,
+  reservedChildNames: string[] = [],
+): Promise<PlannedWorktree[]> {
+  const repositories = await Promise.all(repositoryPaths.map(inspectRepository));
+  if (new Set(repositories.map((repository) => repository.path)).size !== repositories.length) {
+    throw new Error("Select each repository only once.");
+  }
+  if (repositories.some((repository) => isInside(folder, repository.path))) {
+    throw new Error("Create worktree groups outside the selected source repositories.");
+  }
+
+  const usedChildNames = new Set(reservedChildNames.map((name) => name.toLowerCase()));
+  return Promise.all(
+    repositories.map(async (repository): Promise<PlannedWorktree> => {
+      const selection = selections[repository.path];
+      const target = repository.branches.find((branch) => branch.ref === selection?.ref);
+      if (!target) throw new Error(`Select an available target branch for ${repository.name}.`);
+
+      let childName = repository.name;
+      let suffix = 2;
+      while (usedChildNames.has(childName.toLowerCase()))
+        childName = `${repository.name}-${suffix++}`;
+      usedChildNames.add(childName.toLowerCase());
+      const worktreePath = path.join(folder, childName);
+      await requireMissing(
+        worktreePath,
+        `The worktree destination already exists for ${repository.name}: ${worktreePath}`,
+      );
+
+      const requestedNewBranchName =
+        selection.newBranchName === undefined
+          ? undefined
+          : await validateNewBranchName(repository, selection.newBranchName);
+      const branchPlan =
+        requestedNewBranchName === undefined
+          ? planBranch(repository, target, groupName, childName)
+          : {
+              mode: target.kind === "remote" ? ("new-remote" as const) : ("new-local" as const),
+              checkedOutBranch: requestedNewBranchName,
+            };
+      return {
+        source: repository.path,
+        sourceName: repository.name,
+        path: worktreePath,
+        selectedRef: target.ref,
+        checkedOutBranch: branchPlan.checkedOutBranch,
+        mode: branchPlan.mode,
+        target,
+        requestedNewBranchName,
+      };
+    }),
+  );
+}
+
+export async function validateNewBranchName(
+  repository: GitRepository,
+  input: string,
+): Promise<string> {
   const name = input.trim();
   if (!name) throw new Error(`Enter a new branch name for ${repository.name}.`);
   try {
@@ -177,64 +298,12 @@ export async function prepareCreatePlan(
   selections: Record<string, BranchSelection>,
 ): Promise<CreatePlan> {
   if (repositoryPaths.length === 0) throw new Error("Select at least one repository.");
-  const groupName = validateFolderName(groupNameInput);
-  const parent = await requireDirectory(destinationParent);
-  await access(parent, constants.W_OK);
-  const folder = path.join(parent, groupName);
+  const { folder, createFolder } = await prepareDestination(destinationParent, groupNameInput);
+  const groupName = groupNameInput.trim() || path.basename(folder);
 
-  try {
-    await lstat(folder);
-    throw new Error(`The destination already exists: ${folder}`);
-  } catch (error) {
-    if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
-  }
+  const worktrees = await planWorktrees(repositoryPaths, folder, groupName, selections);
 
-  const repositories = await Promise.all(repositoryPaths.map(inspectRepository));
-  if (new Set(repositories.map((repository) => repository.path)).size !== repositories.length) {
-    throw new Error("Select each repository only once.");
-  }
-  if (repositories.some((repository) => isInside(folder, repository.path))) {
-    throw new Error("Create worktree groups outside the selected source repositories.");
-  }
-
-  const usedChildNames = new Set<string>();
-  const worktrees = await Promise.all(
-    repositories.map(async (repository): Promise<PlannedWorktree> => {
-      const selection = selections[repository.path];
-      const target = repository.branches.find((branch) => branch.ref === selection?.ref);
-      if (!target) throw new Error(`Select an available target branch for ${repository.name}.`);
-
-      let childName = repository.name;
-      let suffix = 2;
-      while (usedChildNames.has(childName.toLowerCase()))
-        childName = `${repository.name}-${suffix++}`;
-      usedChildNames.add(childName.toLowerCase());
-
-      const requestedNewBranchName =
-        selection.newBranchName === undefined
-          ? undefined
-          : await validateNewBranchName(repository, selection.newBranchName);
-      const branchPlan =
-        requestedNewBranchName === undefined
-          ? planBranch(repository, target, groupName, childName)
-          : {
-              mode: target.kind === "remote" ? ("new-remote" as const) : ("new-local" as const),
-              checkedOutBranch: requestedNewBranchName,
-            };
-      return {
-        source: repository.path,
-        sourceName: repository.name,
-        path: path.join(folder, childName),
-        selectedRef: target.ref,
-        checkedOutBranch: branchPlan.checkedOutBranch,
-        mode: branchPlan.mode,
-        target,
-        requestedNewBranchName,
-      };
-    }),
-  );
-
-  return { folder, worktrees };
+  return { folder, createFolder, worktrees };
 }
 
 async function writeManifest(folder: string, manifest: GroupManifest): Promise<void> {
@@ -244,6 +313,22 @@ async function writeManifest(folder: string, manifest: GroupManifest): Promise<v
   await rename(temporaryPath, manifestPath);
 }
 
+async function addPlannedWorktree(worktree: PlannedWorktree): Promise<void> {
+  const args =
+    worktree.mode === "existing"
+      ? ["worktree", "add", worktree.path, worktree.checkedOutBranch]
+      : [
+          "worktree",
+          "add",
+          "--no-track",
+          "-b",
+          worktree.checkedOutBranch,
+          worktree.path,
+          worktree.selectedRef,
+        ];
+  await runGit(worktree.source, args);
+}
+
 export async function createGroup(
   plan: CreatePlan,
   onProgress?: (completed: number) => void,
@@ -251,8 +336,8 @@ export async function createGroup(
   // Recheck the filesystem and refs after the user's confirmation.
   const fresh = await prepareCreatePlan(
     plan.worktrees.map((worktree) => worktree.source),
-    path.dirname(plan.folder),
-    path.basename(plan.folder),
+    plan.createFolder ? path.dirname(plan.folder) : plan.folder,
+    plan.createFolder ? path.basename(plan.folder) : "",
     Object.fromEntries(
       plan.worktrees.map((worktree) => [
         worktree.source,
@@ -262,6 +347,7 @@ export async function createGroup(
   );
   if (
     fresh.folder !== plan.folder ||
+    fresh.createFolder !== plan.createFolder ||
     fresh.worktrees.some(
       (worktree, index) =>
         worktree.path !== plan.worktrees[index]?.path ||
@@ -272,10 +358,11 @@ export async function createGroup(
   ) {
     throw new Error("The worktree plan changed after confirmation. Review it and try again.");
   }
-  await mkdir(fresh.folder);
+  if (fresh.createFolder) await mkdir(fresh.folder);
   const manifest: GroupManifest = {
-    version: 1,
+    version: 2,
     createdAt: new Date().toISOString(),
+    ownsFolder: fresh.createFolder,
     worktrees: [],
   };
   let completed = 0;
@@ -283,19 +370,7 @@ export async function createGroup(
   try {
     await writeManifest(fresh.folder, manifest);
     for (const worktree of fresh.worktrees) {
-      const args =
-        worktree.mode === "existing"
-          ? ["worktree", "add", worktree.path, worktree.checkedOutBranch]
-          : [
-              "worktree",
-              "add",
-              "--no-track",
-              "-b",
-              worktree.checkedOutBranch,
-              worktree.path,
-              worktree.selectedRef,
-            ];
-      await runGit(worktree.source, args);
+      await addPlannedWorktree(worktree);
       completed++;
       manifest.worktrees.push({
         source: worktree.source,
@@ -325,7 +400,7 @@ async function readManifest(folder: string): Promise<GroupManifest | undefined> 
       !parsed ||
       typeof parsed !== "object" ||
       !("version" in parsed) ||
-      parsed.version !== 1 ||
+      (parsed.version !== 1 && parsed.version !== 2) ||
       !("worktrees" in parsed) ||
       !Array.isArray(parsed.worktrees)
     ) {
@@ -333,15 +408,28 @@ async function readManifest(folder: string): Promise<GroupManifest | undefined> 
     }
     const manifest = parsed as GroupManifest;
     if (
+      typeof manifest.createdAt !== "string" ||
+      (manifest.version === 2 && typeof manifest.ownsFolder !== "boolean")
+    ) {
+      throw new Error("Invalid DevUtils group manifest.");
+    }
+    if (
       manifest.worktrees.some(
         (item) =>
           !item ||
           typeof item.path !== "string" ||
           typeof item.source !== "string" ||
+          typeof item.selectedRef !== "string" ||
+          typeof item.checkedOutBranch !== "string" ||
+          !path.isAbsolute(item.path) ||
+          !path.isAbsolute(item.source) ||
           !isInside(item.path, folder),
       )
     ) {
       throw new Error("The DevUtils group manifest contains invalid paths.");
+    }
+    if (new Set(manifest.worktrees.map((item) => item.path)).size !== manifest.worktrees.length) {
+      throw new Error("The DevUtils group manifest contains duplicate worktree paths.");
     }
     return manifest;
   } catch (error) {
@@ -353,6 +441,7 @@ async function readManifest(folder: string): Promise<GroupManifest | undefined> 
 async function inspectLinkedWorktree(
   childPath: string,
   groupFolder: string,
+  sourceMustBeOutsideGroup: boolean,
 ): Promise<InspectedWorktree> {
   const root = (await runGit(childPath, ["rev-parse", "--show-toplevel"])).trim();
   if ((await realpath(root)) !== childPath) throw new Error(`${childPath} is not a worktree root.`);
@@ -360,7 +449,12 @@ async function inspectLinkedWorktree(
   const worktrees = await listWorktrees(childPath);
   const main = worktrees[0];
   const linked = worktrees.slice(1).find((worktree) => worktree.path === childPath);
-  if (!main || !linked || linked.bare || isInside(main.path, groupFolder)) {
+  if (
+    !main ||
+    !linked ||
+    linked.bare ||
+    (sourceMustBeOutsideGroup && isInside(main.path, groupFolder))
+  ) {
     throw new Error(`${childPath} is not a linked worktree with a source outside this folder.`);
   }
   const source = await requireDirectory(main.path);
@@ -400,31 +494,37 @@ export async function inspectGroup(folderPath: string): Promise<GroupInspection>
   }
 
   const manifest = await readManifest(folder);
-  const items = await readdir(folder, { withFileTypes: true });
-  const children = items.filter((item) => item.name !== MANIFEST_NAME);
-  const invalid = children.filter((item) => !item.isDirectory() || item.isSymbolicLink());
-  if (invalid.length) {
+  const removeFolder = manifest?.ownsFolder ?? true;
+  const items = (await readdir(folder, { withFileTypes: true })).filter(
+    (item) => item.name !== MANIFEST_NAME,
+  );
+  const invalid = items.filter((item) => !item.isDirectory() || item.isSymbolicLink());
+  if (removeFolder && invalid.length) {
     throw new Error(
       `Folder contains non-worktree items: ${invalid.map((item) => item.name).join(", ")}`,
     );
   }
-  if (children.length === 0 && !manifest)
-    throw new Error("The selected folder has no linked worktrees.");
 
-  const worktrees = await Promise.all(
-    children.map(async (item) => {
-      const childPath = await requireDirectory(path.join(folder, item.name));
-      return inspectLinkedWorktree(childPath, folder);
-    }),
+  const inspected = await Promise.all(
+    items
+      .filter((item) => item.isDirectory() && !item.isSymbolicLink())
+      .map(async (item) => {
+        const childPath = await requireDirectory(path.join(folder, item.name));
+        try {
+          return await inspectLinkedWorktree(childPath, folder, removeFolder);
+        } catch (error) {
+          // A reused destination may contain unrelated directories. DevUtils-owned and
+          // legacy folders stay strict because removing the group may remove the folder.
+          if (removeFolder) throw error;
+          return undefined;
+        }
+      }),
   );
-  if (manifest) {
-    for (const worktree of worktrees) {
-      const recorded = manifest.worktrees.find((item) => item.path === worktree.path);
-      if (recorded && recorded.source !== worktree.source) {
-        throw new Error(`The source repository changed for ${path.basename(worktree.path)}.`);
-      }
-    }
-  }
+  const worktrees = inspected.filter(
+    (worktree): worktree is InspectedWorktree => worktree !== undefined,
+  );
+  if (worktrees.length === 0 && !manifest)
+    throw new Error("The selected folder has no linked worktrees.");
 
   return {
     folder,
@@ -433,7 +533,176 @@ export async function inspectGroup(folderPath: string): Promise<GroupInspection>
       worktree.issues.map((issue) => `${path.basename(worktree.path)}: ${issue}`),
     ),
     hasManifest: Boolean(manifest),
+    removeFolder,
   };
+}
+
+export async function inspectManagedGroup(folderPath: string): Promise<ManagedGroupInspection> {
+  const inspection = await inspectGroup(folderPath);
+  const existing = await readManifest(inspection.folder);
+  const manifest: GroupManifest = {
+    version: existing?.version ?? 2,
+    createdAt: existing?.createdAt ?? new Date().toISOString(),
+    ownsFolder: existing?.ownsFolder ?? false,
+    worktrees: inspection.worktrees.map((worktree) => {
+      const recorded = existing?.worktrees.find(
+        (item) => item.path === worktree.path && item.source === worktree.source,
+      );
+      return {
+        source: worktree.source,
+        path: worktree.path,
+        selectedRef:
+          recorded?.selectedRef ?? (worktree.branch ? `refs/heads/${worktree.branch}` : "HEAD"),
+        checkedOutBranch: worktree.branch ?? "HEAD",
+      };
+    }),
+  };
+  return { ...inspection, manifest };
+}
+
+export async function prepareUpdatePlan(
+  folderPath: string,
+  repositoryPaths: string[],
+  selections: Record<string, BranchSelection>,
+  removalPaths: string[],
+): Promise<UpdatePlan> {
+  const group = await inspectManagedGroup(folderPath);
+  const removalSet = new Set(removalPaths);
+  if (removalSet.size !== removalPaths.length) {
+    throw new Error("Select each worktree for removal only once.");
+  }
+
+  const removals = group.worktrees.filter((worktree) => removalSet.has(worktree.path));
+  if (removals.length !== removalSet.size) {
+    throw new Error("A selected worktree is no longer part of this group.");
+  }
+  const blocked = removals.flatMap((worktree) =>
+    worktree.issues.map((issue) => `${path.basename(worktree.path)}: ${issue}`),
+  );
+  if (blocked.length) {
+    throw new Error(`Cannot remove worktrees with local changes: ${blocked.join("; ")}`);
+  }
+
+  const currentSources = new Set(group.worktrees.map((worktree) => worktree.source));
+  const additions = await planWorktrees(
+    repositoryPaths,
+    group.folder,
+    path.basename(group.folder),
+    selections,
+    group.worktrees.map((worktree) => path.basename(worktree.path)),
+  );
+  const duplicate = additions.find((worktree) => currentSources.has(worktree.source));
+  if (duplicate) {
+    throw new Error(`${duplicate.sourceName} is already part of this worktree group.`);
+  }
+  if (additions.length === 0 && removals.length === 0) {
+    throw new Error("Add or remove at least one repository before updating the group.");
+  }
+
+  return { folder: group.folder, additions, removals };
+}
+
+function sameUpdatePlan(first: UpdatePlan, second: UpdatePlan): boolean {
+  return (
+    first.folder === second.folder &&
+    first.additions.length === second.additions.length &&
+    first.removals.length === second.removals.length &&
+    first.additions.every((worktree, index) => {
+      const other = second.additions[index];
+      if (!other) return false;
+      return (
+        worktree.source === other.source &&
+        worktree.path === other.path &&
+        worktree.selectedRef === other.selectedRef &&
+        worktree.checkedOutBranch === other.checkedOutBranch &&
+        worktree.mode === other.mode
+      );
+    }) &&
+    first.removals.every((worktree, index) => {
+      const other = second.removals[index];
+      if (!other) return false;
+      return (
+        worktree.source === other.source &&
+        worktree.path === other.path &&
+        worktree.branch === other.branch
+      );
+    })
+  );
+}
+
+export async function updateGroup(
+  plan: UpdatePlan,
+  onProgress?: (progress: UpdateProgress) => void,
+): Promise<UpdateResult> {
+  const selections = Object.fromEntries(
+    plan.additions.map((worktree) => [
+      worktree.source,
+      { ref: worktree.selectedRef, newBranchName: worktree.requestedNewBranchName },
+    ]),
+  );
+  const fresh = await prepareUpdatePlan(
+    plan.folder,
+    plan.additions.map((worktree) => worktree.source),
+    selections,
+    plan.removals.map((worktree) => worktree.path),
+  );
+  if (!sameUpdatePlan(plan, fresh)) {
+    throw new Error("The worktree group changed after confirmation. Review it and try again.");
+  }
+
+  const inspected = await inspectManagedGroup(fresh.folder);
+  const manifest: GroupManifest = {
+    version: 2,
+    createdAt: inspected.manifest.createdAt,
+    ownsFolder: inspected.manifest.ownsFolder ?? true,
+    worktrees: [...inspected.manifest.worktrees],
+  };
+  const total = fresh.additions.length + fresh.removals.length;
+  let completed = 0;
+  let added = 0;
+  let removed = 0;
+
+  try {
+    for (const worktree of fresh.additions) {
+      await addPlannedWorktree(worktree);
+      manifest.worktrees.push({
+        source: worktree.source,
+        path: worktree.path,
+        selectedRef: worktree.selectedRef,
+        checkedOutBranch: worktree.checkedOutBranch,
+      });
+      await writeManifest(fresh.folder, manifest);
+      added++;
+      completed++;
+      onProgress?.({ completed, total, phase: "adding" });
+    }
+
+    for (const worktree of fresh.removals) {
+      const current = await inspectLinkedWorktree(
+        worktree.path,
+        fresh.folder,
+        manifest.ownsFolder ?? true,
+      );
+      if (current.issues.length || current.source !== worktree.source) {
+        throw new Error(`Removal blocked: ${path.basename(worktree.path)} changed during update.`);
+      }
+      await runGit(worktree.source, ["worktree", "remove", worktree.path]);
+      manifest.worktrees = manifest.worktrees.filter((item) => item.path !== worktree.path);
+      await writeManifest(fresh.folder, manifest);
+      removed++;
+      completed++;
+      onProgress?.({ completed, total, phase: "removing" });
+    }
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "Update failed.";
+    throw new PartialGroupError(
+      `${completed} of ${total} changes applied. ${detail}`,
+      fresh.folder,
+      completed,
+    );
+  }
+
+  return { added, removed };
 }
 
 export async function removeGroup(
@@ -443,6 +712,7 @@ export async function removeGroup(
   const fresh = await inspectGroup(inspection.folder);
   if (fresh.issues.length) throw new Error(`Removal blocked: ${fresh.issues.join("; ")}`);
   if (
+    fresh.removeFolder !== inspection.removeFolder ||
     fresh.worktrees.length !== inspection.worktrees.length ||
     fresh.worktrees.some((worktree, index) => {
       const reviewed = inspection.worktrees[index];
@@ -459,7 +729,7 @@ export async function removeGroup(
   let completed = 0;
   try {
     for (const worktree of fresh.worktrees) {
-      const current = await inspectLinkedWorktree(worktree.path, fresh.folder);
+      const current = await inspectLinkedWorktree(worktree.path, fresh.folder, fresh.removeFolder);
       if (current.issues.length || current.source !== worktree.source) {
         throw new Error(`Removal blocked: ${path.basename(worktree.path)} changed during removal.`);
       }
@@ -475,7 +745,9 @@ export async function removeGroup(
       }
     }
     if (fresh.hasManifest) await unlink(path.join(fresh.folder, MANIFEST_NAME));
-    await rmdir(fresh.folder); // This cannot remove a folder containing unrelated files.
+    if (fresh.removeFolder) {
+      await rmdir(fresh.folder); // This cannot remove a folder containing unrelated files.
+    }
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Removal failed.";
     throw new PartialGroupError(

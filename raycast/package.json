@@ -3,7 +3,7 @@
   "name": "devutils",
   "title": "DevUtils",
   "version": "1.0.0",
-  "description": "Open DevUtils pages and manage local Git worktree groups from Raycast.",
+  "description": "Open DevUtils pages and manage local Git worktree folders from Raycast.",
   "icon": "icon.png",
   "author": "jiweilim",
   "platforms": [
@@ -160,19 +160,42 @@
     },
     {
       "name": "create-worktree-group",
-      "title": "Create Worktree Group",
+      "title": "Create Worktree Folder",
       "subtitle": "DevUtils",
-      "description": "Create linked Git worktrees for multiple local repositories in one new folder.",
+      "description": "Create linked Git worktrees for local repositories in a chosen destination.",
       "mode": "view",
-      "keywords": ["git", "worktree", "branches", "repository"]
+      "keywords": [
+        "git",
+        "worktree",
+        "branches",
+        "repository"
+      ]
+    },
+    {
+      "name": "update-worktree-group",
+      "title": "Update Worktree Folder",
+      "subtitle": "DevUtils",
+      "description": "Add repositories or remove worktrees in an existing worktree folder.",
+      "mode": "view",
+      "keywords": [
+        "git",
+        "worktree",
+        "update",
+        "repository"
+      ]
     },
     {
       "name": "remove-worktree-group",
-      "title": "Remove Worktree Group",
+      "title": "Remove Worktree Folder",
       "subtitle": "DevUtils",
-      "description": "Safely remove linked worktrees and their empty enclosing folder.",
+      "description": "Safely remove linked worktrees from a worktree folder.",
       "mode": "view",
-      "keywords": ["git", "worktree", "delete", "cleanup"]
+      "keywords": [
+        "git",
+        "worktree",
+        "delete",
+        "cleanup"
+      ]
     }
   ],
   "dependencies": {
