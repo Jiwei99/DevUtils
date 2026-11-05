@@ -46,7 +46,7 @@ function RemovalReview({
           .map((worktree) => `${worktree.path} (${worktree.branch ?? "detached"})`)
           .join(
             "\n",
-          )}\n\nGit branches and source repositories will remain.${fresh.removeFolder ? "" : " The selected destination folder and any unrelated contents will remain."}`,
+          )}${fresh.junk.length ? `\n\nAlso deletes: ${fresh.junk.join(", ")}` : ""}\n\nGit branches and source repositories will remain.${fresh.removeFolder ? "" : " The selected destination folder and any unrelated contents will remain."}`,
         primaryAction: {
           title: fresh.removeFolder ? "Remove Worktrees and Folder" : "Remove Worktrees",
           style: Alert.ActionStyle.Destructive,

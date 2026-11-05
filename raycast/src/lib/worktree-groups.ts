@@ -6,11 +6,12 @@ import {
   readdir,
   realpath,
   rename,
+  rm,
   rmdir,
   unlink,
   writeFile,
 } from "node:fs/promises";
-import { constants } from "node:fs";
+import { constants, type Dirent } from "node:fs";
 import path from "node:path";
 import {
   inspectRepository,
@@ -23,6 +24,12 @@ import {
 } from "./git-worktrees";
 
 const MANIFEST_NAME = ".devutils-worktree-group.json";
+
+// OS metadata files that are safe to delete with a worktree group folder.
+const JUNK_FILE_NAMES = new Set([".DS_Store", ".localized", "Thumbs.db", "desktop.ini", "Icon\r"]);
+// Directories that may only hold log files, e.g. created by running a service from the group folder.
+const LOG_DIRECTORY_NAMES = new Set(["log", "logs"]);
+const LOG_FILE_PATTERN = /\.log(\.|$)/;
 
 export type ManifestWorktree = {
   source: string;
@@ -69,6 +76,8 @@ export type GroupInspection = {
   issues: string[];
   hasManifest: boolean;
   removeFolder: boolean;
+  /** Names of OS metadata files and log-only folders deleted together with the group folder. */
+  junk: string[];
 };
 
 export type PreparedDestination = {
@@ -466,22 +475,44 @@ async function inspectLinkedWorktree(
     "--porcelain=v1",
     "-z",
     "--untracked-files=all",
-    "--ignored=matching",
     "--ignore-submodules=none",
   ]);
+  // Gitignored files (logs, build output) do not block removal; `git worktree remove`
+  // deletes them along with the worktree.
   const entries = status.split("\0").filter(Boolean);
-  const modified = entries.filter(
-    (item) => !item.startsWith("??") && !item.startsWith("!!"),
-  ).length;
+  const modified = entries.filter((item) => !item.startsWith("??")).length;
   const untracked = entries.filter((item) => item.startsWith("??")).length;
-  const ignored = entries.filter((item) => item.startsWith("!!")).length;
   if (modified) issues.push(`${modified} tracked changes`);
   if (untracked) issues.push(`${untracked} untracked paths`);
-  if (ignored) issues.push(`${ignored} ignored paths`);
 
   const index = await runGit(childPath, ["ls-files", "--stage"]);
   if (index.split("\n").some((item) => item.startsWith("160000 "))) issues.push("submodules");
   return { source, path: childPath, branch: linked.branch?.replace(/^refs\/heads\//, ""), issues };
+}
+
+function isJunkFileName(name: string): boolean {
+  return JUNK_FILE_NAMES.has(name) || name.startsWith("._");
+}
+
+async function containsOnlyLogFiles(directoryPath: string): Promise<boolean> {
+  for (const item of await readdir(directoryPath, { withFileTypes: true })) {
+    if (item.isSymbolicLink()) return false;
+    if (item.isDirectory()) {
+      if (!(await containsOnlyLogFiles(path.join(directoryPath, item.name)))) return false;
+    } else if (!item.isFile() || !(LOG_FILE_PATTERN.test(item.name) || isJunkFileName(item.name))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+async function isJunkEntry(folder: string, item: Dirent): Promise<boolean> {
+  if (item.isSymbolicLink()) return false;
+  if (item.isFile()) return isJunkFileName(item.name) || LOG_FILE_PATTERN.test(item.name);
+  if (item.isDirectory() && LOG_DIRECTORY_NAMES.has(item.name.toLowerCase())) {
+    return containsOnlyLogFiles(path.join(folder, item.name));
+  }
+  return false;
 }
 
 export async function inspectGroup(folderPath: string): Promise<GroupInspection> {
@@ -495,9 +526,12 @@ export async function inspectGroup(folderPath: string): Promise<GroupInspection>
 
   const manifest = await readManifest(folder);
   const removeFolder = manifest?.ownsFolder ?? true;
-  const items = (await readdir(folder, { withFileTypes: true })).filter(
+  const entries = (await readdir(folder, { withFileTypes: true })).filter(
     (item) => item.name !== MANIFEST_NAME,
   );
+  const junkFlags = await Promise.all(entries.map((item) => isJunkEntry(folder, item)));
+  const junk = entries.filter((_, index) => junkFlags[index]).map((item) => item.name);
+  const items = entries.filter((_, index) => !junkFlags[index]);
   const invalid = items.filter((item) => !item.isDirectory() || item.isSymbolicLink());
   if (removeFolder && invalid.length) {
     throw new Error(
@@ -515,8 +549,9 @@ export async function inspectGroup(folderPath: string): Promise<GroupInspection>
         } catch (error) {
           // A reused destination may contain unrelated directories. DevUtils-owned and
           // legacy folders stay strict because removing the group may remove the folder.
-          if (removeFolder) throw error;
-          return undefined;
+          if (!removeFolder) return undefined;
+          const detail = error instanceof Error ? error.message : "Unable to inspect it.";
+          throw new Error(`${item.name} is not a linked worktree: ${detail}`);
         }
       }),
   );
@@ -534,6 +569,7 @@ export async function inspectGroup(folderPath: string): Promise<GroupInspection>
     ),
     hasManifest: Boolean(manifest),
     removeFolder,
+    junk: removeFolder ? junk : [],
   };
 }
 
@@ -746,6 +782,9 @@ export async function removeGroup(
     }
     if (fresh.hasManifest) await unlink(path.join(fresh.folder, MANIFEST_NAME));
     if (fresh.removeFolder) {
+      for (const name of fresh.junk) {
+        await rm(path.join(fresh.folder, name), { recursive: true, force: true });
+      }
       await rmdir(fresh.folder); // This cannot remove a folder containing unrelated files.
     }
   } catch (error) {
