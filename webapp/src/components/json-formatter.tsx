@@ -9,6 +9,7 @@ export function JsonFormatter() {
   const [input, setInput] = useState("");
   const [result, setResult] = useState("");
   const [arrayStyle, setArrayStyle] = useState<ArrayStyle>("expanded");
+  const [indent, setIndent] = useState<2 | 4>(2);
   const [sortKeys, setSortKeys] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
@@ -21,13 +22,16 @@ export function JsonFormatter() {
     }
 
     try {
-      setResult(formatJson(input, { arrayStyle, sortKeys }));
+      setResult(formatJson(input, { arrayStyle, indent, sortKeys }));
       setError("");
       setCopied(false);
     } catch (caughtError) {
       setResult("");
-      const message = caughtError instanceof Error ? caughtError.message : "Invalid JSON.";
-      setError(message.replace(/^Unexpected token/, "Invalid JSON — unexpected token"));
+      const message =
+        caughtError instanceof Error ? caughtError.message : "Invalid JSON.";
+      setError(
+        message.replace(/^Unexpected token/, "Invalid JSON — unexpected token"),
+      );
     }
   }
 
@@ -39,7 +43,9 @@ export function JsonFormatter() {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
-      setError("Couldn’t copy automatically. Select the result and copy it manually.");
+      setError(
+        "Couldn’t copy automatically. Select the result and copy it manually.",
+      );
     }
   }
 
@@ -63,7 +69,11 @@ export function JsonFormatter() {
         <div className="options-bar" aria-label="Format options">
           <div className="option">
             <span className="option-label">Arrays</span>
-            <div className="segmented-control" role="group" aria-label="Array display style">
+            <div
+              className="segmented-control"
+              role="group"
+              aria-label="Array display style"
+            >
               <button
                 className={`segment${arrayStyle === "expanded" ? " active" : ""}`}
                 type="button"
@@ -83,6 +93,31 @@ export function JsonFormatter() {
             </div>
           </div>
           <div className="option">
+            <span className="option-label">Indent</span>
+            <div
+              className="segmented-control"
+              role="group"
+              aria-label="Indentation size"
+            >
+              <button
+                className={`segment${indent === 2 ? " active" : ""}`}
+                type="button"
+                onClick={() => setIndent(2)}
+                aria-pressed={indent === 2}
+              >
+                2 spaces
+              </button>
+              <button
+                className={`segment${indent === 4 ? " active" : ""}`}
+                type="button"
+                onClick={() => setIndent(4)}
+                aria-pressed={indent === 4}
+              >
+                4 spaces
+              </button>
+            </div>
+          </div>
+          <div className="option">
             <span className="option-label">Sort fields A–Z</span>
             <button
               type="button"
@@ -97,8 +132,14 @@ export function JsonFormatter() {
         <div className="editor-grid">
           <div className="editor-panel">
             <div className="panel-heading">
-              <span className="panel-title"><Icon name="clipboard" /> JSON input</span>
-              <button className="clear-button" type="button" onClick={handleClear}>
+              <span className="panel-title">
+                <Icon name="clipboard" /> JSON input
+              </span>
+              <button
+                className="clear-button"
+                type="button"
+                onClick={handleClear}
+              >
                 <Icon name="trash" /> Clear
               </button>
             </div>
@@ -119,7 +160,9 @@ export function JsonFormatter() {
 
           <div className="editor-panel">
             <div className="panel-heading">
-              <span className="panel-title"><Icon name="braces" /> Formatted result</span>
+              <span className="panel-title">
+                <Icon name="braces" /> Formatted result
+              </span>
               {result && (
                 <button
                   className={`copy-button${copied ? " success" : ""}`}
@@ -132,19 +175,41 @@ export function JsonFormatter() {
             </div>
             <div className="result-wrap">
               {result ? (
-                <pre className="result" aria-label="Formatted JSON result">{result}</pre>
+                <pre className="result" aria-label="Formatted JSON result">
+                  <code className="result-code">
+                    {result.split("\n").map((line, index) => (
+                      <span className="result-line" key={index}>
+                        <span className="result-line-number" aria-hidden="true">
+                          {index + 1}
+                        </span>
+                        <span className="result-line-content">
+                          {line || " "}
+                        </span>
+                      </span>
+                    ))}
+                  </code>
+                </pre>
               ) : (
-                <div className="empty-result">Your formatted JSON will appear here.</div>
+                <div className="empty-result">
+                  Your formatted JSON will appear here.
+                </div>
               )}
             </div>
           </div>
         </div>
 
         <footer className="formatter-footer">
-          <span className={`status-message${error ? " error" : ""}`} role="status">
+          <span
+            className={`status-message${error ? " error" : ""}`}
+            role="status"
+          >
             {error || "Tip: press ⌘ / Ctrl + Enter to format"}
           </span>
-          <button className="format-button" type="button" onClick={handleFormat}>
+          <button
+            className="format-button"
+            type="button"
+            onClick={handleFormat}
+          >
             <Icon name="format" /> Format JSON
           </button>
         </footer>

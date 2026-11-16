@@ -3,7 +3,7 @@
   "name": "devutils",
   "title": "DevUtils",
   "version": "1.0.0",
-  "description": "Open DevUtils pages and manage local Git worktree folders from Raycast.",
+  "description": "Open DevUtils pages, clear developer caches, manage worktree folders, and control Caffeinate from Raycast.",
   "icon": "icon.png",
   "author": "jiweilim",
   "platforms": [
@@ -156,6 +156,71 @@
         "chrome",
         "macos",
         "keys"
+      ]
+    },
+    {
+      "name": "clear-go-cache",
+      "title": "Clear Go Caches",
+      "subtitle": "DevUtils",
+      "description": "Choose and clear Go build, test, fuzz, or module caches.",
+      "mode": "view",
+      "keywords": [
+        "golang",
+        "clean",
+        "cache",
+        "modules"
+      ]
+    },
+    {
+      "name": "clear-rust-cache",
+      "title": "Clear Rust Build Caches",
+      "subtitle": "DevUtils",
+      "description": "Run cargo clean for one or more selected Rust packages or workspaces.",
+      "mode": "view",
+      "keywords": [
+        "cargo",
+        "clean",
+        "cache",
+        "target"
+      ]
+    },
+    {
+      "name": "clear-npm-cache",
+      "title": "Clear npm Cache",
+      "subtitle": "DevUtils",
+      "description": "Clear npm's downloaded package cache after confirmation.",
+      "mode": "no-view",
+      "keywords": [
+        "node",
+        "javascript",
+        "packages",
+        "clean"
+      ]
+    },
+    {
+      "name": "clear-python-cache",
+      "title": "Clear Python Package Cache",
+      "subtitle": "DevUtils",
+      "description": "Clear pip's cached downloads and wheels after confirmation.",
+      "mode": "no-view",
+      "keywords": [
+        "pip",
+        "wheels",
+        "packages",
+        "clean"
+      ]
+    },
+    {
+      "name": "caffeinate",
+      "title": "Caffeinate",
+      "subtitle": "DevUtils",
+      "description": "Start or stop a macOS Caffeinate session that keeps the display and system awake.",
+      "mode": "view",
+      "keywords": [
+        "awake",
+        "sleep",
+        "display",
+        "macos"
       ]
     },
     {

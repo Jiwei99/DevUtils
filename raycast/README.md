@@ -26,6 +26,23 @@ All routes use this base URL:
 https://devutils.jiwei.dev
 ```
 
+## Cache-cleaning commands
+
+| Raycast command            | Scope                                                                |
+| -------------------------- | -------------------------------------------------------------------- |
+| Clear Go Caches            | Select Go build, test, fuzz, and module caches before clearing.      |
+| Clear Rust Build Caches    | Select Cargo packages or workspaces and run `cargo clean` for each.  |
+| Clear npm Cache            | Clear npm's downloaded package cache with `npm cache clean --force`. |
+| Clear Python Package Cache | Clear pip's cached downloads and wheels with `pip cache purge`.      |
+
+Every cache command shows its scope and asks for confirmation before deleting data. Go build and test caches are selected by default; module and fuzz caches require explicit selection. Rust accepts multiple packages or workspaces, validates every selected folder, then cleans them in sequence and reports partial failures. Rust cleanup is project-scoped because stable Cargo automatically garbage-collects old global registry and Git dependency cache entries. npm cleanup preserves project `node_modules` folders, and Python cleanup preserves virtual environments and installed packages.
+
+## Caffeinate
+
+The **Caffeinate** command shows whether a session is active and when it started. Starting it runs macOS Caffeinate with display and idle-system sleep prevention. The session stays active after Raycast closes and continues until it is stopped from the command or the process ends.
+
+Raycast local storage records the process ID, the time DevUtils started the session, and the operating system's process start time. Before stopping a session, DevUtils checks both the executable and process start time so that it does not stop an unrelated process if macOS has reused the same process ID. Stale records are removed automatically.
+
 ## Git worktree commands
 
 | Raycast command        | Purpose                                                                      |
@@ -96,9 +113,12 @@ raycast/
 │   └── icon.svg
 ├── src/
 │   ├── lib/
+│   │   ├── cache-cleaning.ts  # Shared tool execution and confirmation
 │   │   ├── open-page.ts       # Shared URL-opening implementation
 │   │   ├── git-worktrees.ts   # Git repository and ref inspection
 │   │   └── worktree-groups.ts # Folder creation, updates, and guarded removal
+│   ├── clear-*-cache.ts(x)     # Go, Rust, npm, and Python cache commands
+│   ├── caffeinate.tsx          # Start, stop, and inspect macOS Caffeinate
 │   ├── open-*.ts              # Browser command entry points
 │   ├── worktree-repository-form.tsx
 │   ├── create-worktree-group.tsx

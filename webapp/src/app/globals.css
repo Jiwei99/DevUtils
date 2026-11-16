@@ -69,7 +69,11 @@ h1 { margin: 0; color: #182433; font-size: clamp(30px, 3vw, 38px); font-weight: 
 .editor-input::placeholder { color: #b1bac6; }
 .editor-input:focus { box-shadow: inset 3px 0 0 #9cbcff; }
 .result-wrap { position: relative; display: flex; min-height: 0; flex: 1; }
-.result { overflow: auto; white-space: pre; }
+.result { overflow: auto; padding: 0; white-space: pre; }
+.result-code { display: block; min-width: max-content; padding-block: 18px; }
+.result-line { display: grid; min-height: 22px; grid-template-columns: 48px minmax(max-content, 1fr); }
+.result-line-number { position: sticky; left: 0; border-right: 1px solid #e8edf3; background: #f8fafc; padding-right: 10px; color: #a0aaba; text-align: right; user-select: none; }
+.result-line-content { padding: 0 20px; white-space: pre; }
 .empty-result { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 250px; padding: 28px; color: #a3adba; font-family: Arial, Helvetica, sans-serif; font-size: 13px; line-height: 1.6; text-align: center; }
 .copy-button, .clear-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 31px; border: 1px solid #dce3eb; border-radius: 6px; background: #fff; padding: 0 9px; color: #667085; font-size: 12px; font-weight: 600; }
 .copy-button:hover, .clear-button:hover { border-color: #c1ccda; color: #344054; }
