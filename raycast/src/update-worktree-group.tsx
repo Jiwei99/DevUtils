@@ -8,6 +8,7 @@ import {
   List,
   Toast,
   confirmAlert,
+  open,
   showToast,
   useNavigation,
 } from "@raycast/api";
@@ -123,6 +124,13 @@ function WorktreeGroupEditor({ initialGroup }: { initialGroup: ManagedGroupInspe
         toast.style = Toast.Style.Success;
         toast.title = "Worktree folder updated";
         toast.message = `${result.added} added · ${result.removed} removed`;
+        const { workspacePath } = result;
+        if (workspacePath) {
+          toast.primaryAction = {
+            title: "Open Workspace",
+            onAction: () => void open(workspacePath),
+          };
+        }
         await refreshGroup();
       } catch (error) {
         toast.style = Toast.Style.Failure;

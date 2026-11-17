@@ -24,6 +24,7 @@ import {
 } from "./git-worktrees";
 
 const MANIFEST_NAME = ".devutils-worktree-group.json";
+const WORKSPACE_EXTENSION = ".code-workspace";
 
 // OS metadata files that are safe to delete with a worktree group folder.
 const JUNK_FILE_NAMES = new Set([".DS_Store", ".localized", "Thumbs.db", "desktop.ini", "Icon\r"]);
@@ -42,6 +43,8 @@ export type GroupManifest = {
   version: 1 | 2;
   createdAt: string;
   ownsFolder?: boolean;
+  /** File name of the VS Code multi-root workspace DevUtils keeps in the group folder. */
+  workspaceFile?: string;
   worktrees: ManifestWorktree[];
 };
 
@@ -75,6 +78,8 @@ export type GroupInspection = {
   worktrees: InspectedWorktree[];
   issues: string[];
   hasManifest: boolean;
+  /** DevUtils-owned VS Code workspace file, deleted together with the group. */
+  workspaceFile?: string;
   removeFolder: boolean;
   /** Names of OS metadata files and log-only folders deleted together with the group folder. */
   junk: string[];
@@ -104,6 +109,12 @@ export type UpdateProgress = {
 export type UpdateResult = {
   added: number;
   removed: number;
+  workspacePath?: string;
+};
+
+export type CreateResult = {
+  created: number;
+  workspacePath?: string;
 };
 
 export class PartialGroupError extends Error {
@@ -322,6 +333,73 @@ async function writeManifest(folder: string, manifest: GroupManifest): Promise<v
   await rename(temporaryPath, manifestPath);
 }
 
+function isWorkspaceFileName(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.endsWith(WORKSPACE_EXTENSION) &&
+    value.length > WORKSPACE_EXTENSION.length &&
+    value === path.basename(value) &&
+    !value.startsWith(".") &&
+    !value.includes("\\") &&
+    !value.includes("\0")
+  );
+}
+
+async function pathExists(targetPath: string): Promise<boolean> {
+  try {
+    await lstat(targetPath);
+    return true;
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return false;
+    throw error;
+  }
+}
+
+async function availableWorkspaceFileName(folder: string): Promise<string> {
+  const baseName = path.basename(folder).replace(/^\.+/, "") || "worktrees";
+  let candidate = `${baseName}${WORKSPACE_EXTENSION}`;
+  let suffix = 2;
+  while (await pathExists(path.join(folder, candidate))) {
+    candidate = `${baseName}-${suffix++}${WORKSPACE_EXTENSION}`;
+  }
+  return candidate;
+}
+
+/**
+ * Writes the VS Code multi-root workspace listing every worktree in the group. Settings and
+ * other keys the user added to an existing workspace file are kept; only `folders` is replaced.
+ * A workspace that is not plain JSON (for example, edited to contain comments) is left as is.
+ * Returns the workspace path, or undefined when the existing file was left untouched.
+ */
+async function writeWorkspace(
+  folder: string,
+  manifest: GroupManifest,
+): Promise<string | undefined> {
+  if (!manifest.workspaceFile) return undefined;
+  const workspacePath = path.join(folder, manifest.workspaceFile);
+  let workspace: Record<string, unknown> = { settings: {} };
+  try {
+    const parsed: unknown = JSON.parse(await readFile(workspacePath, "utf8"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
+    workspace = parsed as Record<string, unknown>;
+  } catch (error) {
+    if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) return undefined;
+  }
+
+  const { settings, ...rest } = workspace;
+  const content = {
+    folders: manifest.worktrees.map((worktree) => ({
+      path: path.relative(folder, worktree.path),
+    })),
+    settings: settings ?? {},
+    ...Object.fromEntries(Object.entries(rest).filter(([key]) => key !== "folders")),
+  };
+  const temporaryPath = `${workspacePath}.tmp`;
+  await writeFile(temporaryPath, `${JSON.stringify(content, null, 2)}\n`, { flag: "w" });
+  await rename(temporaryPath, workspacePath);
+  return workspacePath;
+}
+
 async function addPlannedWorktree(worktree: PlannedWorktree): Promise<void> {
   const args =
     worktree.mode === "existing"
@@ -341,7 +419,7 @@ async function addPlannedWorktree(worktree: PlannedWorktree): Promise<void> {
 export async function createGroup(
   plan: CreatePlan,
   onProgress?: (completed: number) => void,
-): Promise<number> {
+): Promise<CreateResult> {
   // Recheck the filesystem and refs after the user's confirmation.
   const fresh = await prepareCreatePlan(
     plan.worktrees.map((worktree) => worktree.source),
@@ -372,9 +450,11 @@ export async function createGroup(
     version: 2,
     createdAt: new Date().toISOString(),
     ownsFolder: fresh.createFolder,
+    workspaceFile: await availableWorkspaceFileName(fresh.folder),
     worktrees: [],
   };
   let completed = 0;
+  let workspacePath: string | undefined;
 
   try {
     await writeManifest(fresh.folder, manifest);
@@ -390,7 +470,10 @@ export async function createGroup(
       await writeManifest(fresh.folder, manifest);
       onProgress?.(completed);
     }
+    workspacePath = await writeWorkspace(fresh.folder, manifest);
   } catch (error) {
+    // Keep the workspace usable for the worktrees that were created.
+    if (completed > 0) await writeWorkspace(fresh.folder, manifest).catch(() => undefined);
     const detail = error instanceof Error ? error.message : "Creation failed.";
     throw new PartialGroupError(
       `${completed} of ${fresh.worktrees.length} worktrees created. ${detail}`,
@@ -398,7 +481,7 @@ export async function createGroup(
       completed,
     );
   }
-  return completed;
+  return { created: completed, workspacePath };
 }
 
 async function readManifest(folder: string): Promise<GroupManifest | undefined> {
@@ -418,7 +501,8 @@ async function readManifest(folder: string): Promise<GroupManifest | undefined> 
     const manifest = parsed as GroupManifest;
     if (
       typeof manifest.createdAt !== "string" ||
-      (manifest.version === 2 && typeof manifest.ownsFolder !== "boolean")
+      (manifest.version === 2 && typeof manifest.ownsFolder !== "boolean") ||
+      (manifest.workspaceFile !== undefined && !isWorkspaceFileName(manifest.workspaceFile))
     ) {
       throw new Error("Invalid DevUtils group manifest.");
     }
@@ -527,7 +611,9 @@ export async function inspectGroup(folderPath: string): Promise<GroupInspection>
   const manifest = await readManifest(folder);
   const removeFolder = manifest?.ownsFolder ?? true;
   const entries = (await readdir(folder, { withFileTypes: true })).filter(
-    (item) => item.name !== MANIFEST_NAME,
+    (item) =>
+      item.name !== MANIFEST_NAME &&
+      !(item.name === manifest?.workspaceFile && item.isFile() && !item.isSymbolicLink()),
   );
   const junkFlags = await Promise.all(entries.map((item) => isJunkEntry(folder, item)));
   const junk = entries.filter((_, index) => junkFlags[index]).map((item) => item.name);
@@ -568,6 +654,7 @@ export async function inspectGroup(folderPath: string): Promise<GroupInspection>
       worktree.issues.map((issue) => `${path.basename(worktree.path)}: ${issue}`),
     ),
     hasManifest: Boolean(manifest),
+    workspaceFile: manifest?.workspaceFile,
     removeFolder,
     junk: removeFolder ? junk : [],
   };
@@ -580,6 +667,7 @@ export async function inspectManagedGroup(folderPath: string): Promise<ManagedGr
     version: existing?.version ?? 2,
     createdAt: existing?.createdAt ?? new Date().toISOString(),
     ownsFolder: existing?.ownsFolder ?? false,
+    workspaceFile: existing?.workspaceFile,
     worktrees: inspection.worktrees.map((worktree) => {
       const recorded = existing?.worktrees.find(
         (item) => item.path === worktree.path && item.source === worktree.source,
@@ -691,12 +779,16 @@ export async function updateGroup(
     version: 2,
     createdAt: inspected.manifest.createdAt,
     ownsFolder: inspected.manifest.ownsFolder ?? true,
+    // Groups created before workspace support get a workspace file on their first update.
+    workspaceFile:
+      inspected.manifest.workspaceFile ?? (await availableWorkspaceFileName(fresh.folder)),
     worktrees: [...inspected.manifest.worktrees],
   };
   const total = fresh.additions.length + fresh.removals.length;
   let completed = 0;
   let added = 0;
   let removed = 0;
+  let workspacePath: string | undefined;
 
   try {
     for (const worktree of fresh.additions) {
@@ -729,7 +821,10 @@ export async function updateGroup(
       completed++;
       onProgress?.({ completed, total, phase: "removing" });
     }
+    await writeManifest(fresh.folder, manifest);
+    workspacePath = await writeWorkspace(fresh.folder, manifest);
   } catch (error) {
+    if (completed > 0) await writeWorkspace(fresh.folder, manifest).catch(() => undefined);
     const detail = error instanceof Error ? error.message : "Update failed.";
     throw new PartialGroupError(
       `${completed} of ${total} changes applied. ${detail}`,
@@ -738,7 +833,7 @@ export async function updateGroup(
     );
   }
 
-  return { added, removed };
+  return { added, removed, workspacePath };
 }
 
 export async function removeGroup(
@@ -779,6 +874,9 @@ export async function removeGroup(
           await writeManifest(fresh.folder, manifest);
         }
       }
+    }
+    if (fresh.workspaceFile) {
+      await rm(path.join(fresh.folder, fresh.workspaceFile), { force: true });
     }
     if (fresh.hasManifest) await unlink(path.join(fresh.folder, MANIFEST_NAME));
     if (fresh.removeFolder) {

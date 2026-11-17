@@ -45,14 +45,16 @@ function isStoredSession(value: unknown): value is CaffeinateSession {
 
 async function readProcessInfo(pid: number): Promise<ProcessInfo | undefined> {
   try {
+    // `comm` must be the last column: macOS truncates it to 16 characters
+    // ("/usr/bin/caffein") when another column follows it.
     const result = await execFileAsync(
       "/bin/ps",
-      ["-p", String(pid), "-o", "comm=", "-o", "lstart="],
+      ["-p", String(pid), "-o", "lstart=", "-o", "comm="],
       { timeout: 2_000 },
     );
-    const match = result.stdout.trim().match(/^(\S+)\s+(.+)$/);
+    const match = result.stdout.trim().match(/^(.*\S)\s+(\/.+)$/);
     if (!match) return undefined;
-    return { command: match[1], startedAt: match[2].trim() };
+    return { command: match[2].trim(), startedAt: match[1] };
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === 1) return undefined;
     throw error;

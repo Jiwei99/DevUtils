@@ -8,9 +8,11 @@ import {
   List,
   Toast,
   confirmAlert,
+  open,
   showToast,
   useNavigation,
 } from "@raycast/api";
+import path from "node:path";
 import { useState } from "react";
 import {
   createGroup,
@@ -80,7 +82,7 @@ function RepositoryList({
         .join("\n");
       const confirmed = await confirmAlert({
         title: `Create ${plan.worktrees.length} worktree${plan.worktrees.length === 1 ? "" : "s"}?`,
-        message: `${plan.folder}\n\n${summary}`,
+        message: `${plan.folder}\n\n${summary}\n\nA VS Code workspace file listing these worktrees will be added to the folder.`,
         primaryAction: { title: "Create Worktrees", style: Alert.ActionStyle.Default },
       });
       if (!confirmed) return;
@@ -91,12 +93,18 @@ function RepositoryList({
         message: plan.folder,
       });
       try {
-        const count = await createGroup(plan, (completed) => {
+        const { created: count, workspacePath } = await createGroup(plan, (completed) => {
           toast.message = `${completed} of ${plan.worktrees.length} created`;
         });
         toast.style = Toast.Style.Success;
         toast.title = `Created ${count} worktree${count === 1 ? "" : "s"}`;
-        toast.message = plan.folder;
+        toast.message = workspacePath ? path.basename(workspacePath) : plan.folder;
+        if (workspacePath) {
+          toast.primaryAction = {
+            title: "Open Workspace",
+            onAction: () => void open(workspacePath),
+          };
+        }
         onCreated();
         pop();
       } catch (error) {

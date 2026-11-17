@@ -44,9 +44,11 @@ function RemovalReview({
         title: `Remove ${fresh.worktrees.length} worktree${fresh.worktrees.length === 1 ? "" : "s"}${fresh.removeFolder ? " and folder" : ""}?`,
         message: `${fresh.folder}\n\n${fresh.worktrees
           .map((worktree) => `${worktree.path} (${worktree.branch ?? "detached"})`)
-          .join(
-            "\n",
-          )}${fresh.junk.length ? `\n\nAlso deletes: ${fresh.junk.join(", ")}` : ""}\n\nGit branches and source repositories will remain.${fresh.removeFolder ? "" : " The selected destination folder and any unrelated contents will remain."}`,
+          .join("\n")}${
+          fresh.junk.length || fresh.workspaceFile
+            ? `\n\nAlso deletes: ${[...(fresh.workspaceFile ? [fresh.workspaceFile] : []), ...fresh.junk].join(", ")}`
+            : ""
+        }\n\nGit branches and source repositories will remain.${fresh.removeFolder ? "" : " The selected destination folder and any unrelated contents will remain."}`,
         primaryAction: {
           title: fresh.removeFolder ? "Remove Worktrees and Folder" : "Remove Worktrees",
           style: Alert.ActionStyle.Destructive,
